@@ -4,41 +4,45 @@ import prisma from '../config/prisma';
 import { hashPassword, comparePassword } from '../utils/password';
 
 export const register = async (req: Request, res: Response) => {
-  // DIAGNOSTIC CHANGE: Only email is now required from the frontend.
-  const { email } = req.body;
-  const name = req.body.name || 'Test User'; // Use provided name or default
-  const password = req.body.password || 'password123'; // Use provided password or default
-  const role = 'CLIENT'; // Role is always CLIENT
+  const { name, email, password, role } = req.body;
 
-  if (!email) {
-    return res.status(400).json({ message: 'Email is required for this diagnostic test.' });
+  if (!name || !email || !password || !role) {
+    return res.status(400).json({ message: 'Name, email, password, and role are required' });
+  }
+
+  // For now, we only handle CLIENT registration as per the frontend logic
+  if (role !== 'CLIENT') {
+    return res.status(400).json({ message: 'Registration is currently only available for the CLIENT role' });
   }
 
   try {
     const hashedPassword = await hashPassword(password);
 
+    // Create the User and the associated Client in a single transaction
     const user = await prisma.user.create({
       data: {
         email,
         password: hashedPassword,
         role,
-        client: { 
+        client: { // Nested write to create a Client simultaneously
           create: {
             name: name,
           },
         },
       },
       include: {
-        client: true,
+        client: true, // Include the created client profile in the response
       },
     });
 
+    // We don't want to send the password back, even if it's hashed
     const { password: _, ...userWithoutPassword } = user;
 
-    res.status(201).json({ message: 'DIAGNOSTIC TEST SUCCESSFUL: User registered', user: userWithoutPassword });
+    res.status(201).json({ message: 'User registered successfully', user: userWithoutPassword });
   } catch (error) {
-    console.error('DIAGNOSTIC ERROR:', error);
-    res.status(400).json({ message: 'User with this email and role already exists', error: error });
+    console.error(error); // Log the actual error for debugging on the server
+    // The unique constraint on user will likely trigger this
+    res.status(400).json({ message: 'User with this email and role already exists' });
   }
 };
 
