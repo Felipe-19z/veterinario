@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { register } from '../services/authService';
 import { Box, TextField, Button, Typography, Paper } from '@mui/material';
 
+// Forcing a redeploy to ensure the latest code is running
 const RegisterPage: React.FC = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');

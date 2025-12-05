@@ -7,23 +7,40 @@ exports.loginVet = exports.login = exports.register = void 0;
 const prisma_1 = __importDefault(require("../config/prisma"));
 const password_1 = require("../utils/password");
 const register = async (req, res) => {
-    const { email, password, role } = req.body;
-    if (!email || !password) {
-        return res.status(400).json({ message: 'Email and password are required' });
+    const { name, email, password, role } = req.body;
+    if (!name || !email || !password || !role) {
+        return res.status(400).json({ message: 'Name, email, password, and role are required' });
+    }
+    // For now, we only handle CLIENT registration as per the frontend logic
+    if (role !== 'CLIENT') {
+        return res.status(400).json({ message: 'Registration is currently only available for the CLIENT role' });
     }
     try {
         const hashedPassword = await (0, password_1.hashPassword)(password);
+        // Create the User and the associated Client in a single transaction
         const user = await prisma_1.default.user.create({
             data: {
                 email,
                 password: hashedPassword,
                 role,
+                client: {
+                    create: {
+                        name: name,
+                    },
+                },
+            },
+            include: {
+                client: true, // Include the created client profile in the response
             },
         });
-        res.status(201).json({ message: 'User registered successfully', user });
+        // We don't want to send the password back, even if it's hashed
+        const { password: _, ...userWithoutPassword } = user;
+        res.status(201).json({ message: 'User registered successfully', user: userWithoutPassword });
     }
     catch (error) {
-        res.status(400).json({ message: 'User already exists' });
+        console.error(error); // Log the actual error for debugging on the server
+        // The unique constraint on user will likely trigger this
+        res.status(400).json({ message: 'User with this email and role already exists' });
     }
 };
 exports.register = register;
