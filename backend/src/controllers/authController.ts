@@ -4,24 +4,45 @@ import prisma from '../config/prisma';
 import { hashPassword, comparePassword } from '../utils/password';
 
 export const register = async (req: Request, res: Response) => {
-  const { email, password, role } = req.body;
+  const { name, email, password, role } = req.body;
 
-  if (!email || !password) {
-    return res.status(400).json({ message: 'Email and password are required' });
+  if (!name || !email || !password || !role) {
+    return res.status(400).json({ message: 'Name, email, password, and role are required' });
+  }
+
+  // For now, we only handle CLIENT registration as per the frontend logic
+  if (role !== 'CLIENT') {
+    return res.status(400).json({ message: 'Registration is currently only available for the CLIENT role' });
   }
 
   try {
     const hashedPassword = await hashPassword(password);
+
+    // Create the User and the associated Client in a single transaction
     const user = await prisma.user.create({
       data: {
         email,
         password: hashedPassword,
         role,
+        client: { // Nested write to create a Client simultaneously
+          create: {
+            name: name,
+          },
+        },
+      },
+      include: {
+        client: true, // Include the created client profile in the response
       },
     });
-    res.status(201).json({ message: 'User registered successfully', user });
+
+    // We don't want to send the password back, even if it's hashed
+    const { password: _, ...userWithoutPassword } = user;
+
+    res.status(201).json({ message: 'User registered successfully', user: userWithoutPassword });
   } catch (error) {
-    res.status(400).json({ message: 'User already exists' });
+    console.error(error); // Log the actual error for debugging on the server
+    // The unique constraint on user will likely trigger this
+    res.status(400).json({ message: 'User with this email and role already exists' });
   }
 };
 
